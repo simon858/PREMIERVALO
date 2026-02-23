@@ -107,6 +107,20 @@ All vars in `.env` — prefix with `REACT_APP_` to expose to React:
 
 ---
 
+## 🔐 Default Credentials
+
+| Role | Credential |
+|---|---|
+| Admin | password: `admin123` |
+| EZIO | password: `ezio123` |
+| SIMON | password: `simon123` |
+| JULIEN | password: `julien123` |
+| AJISHAN | password: `ajishan123` |
+| KLIPERR | password: `kliperr123` |
+| ZED | password: `zed123` |
+
+---
+
 ## 🛠 Tech Stack
 
 - **React 18** with hooks (no class components)
