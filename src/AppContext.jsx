@@ -20,27 +20,32 @@ export const AppProvider = ({ children }) => {
   const [msRiotIds,     setMsRiotIdsRaw]     = useState(() => loadFromStorage(STORAGE_KEYS.riotIds) || {});
   const [loading,       setLoading]          = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [p, m, po] = await Promise.all([
-          api.getPlayers(),
-          api.getMatches(),
-          api.getPolls(),
-        ]);
-        setPlayersRaw(migratePlayers(p));
-        setMatchesRaw(migrateMatches(m));
-        setPollsRaw(migratePolls(po));
-      } catch (err) {
+  const fetchAll = async (initial = false) => {
+    try {
+      const [p, m, po] = await Promise.all([
+        api.getPlayers(),
+        api.getMatches(),
+        api.getPolls(),
+      ]);
+      setPlayersRaw(migratePlayers(p));
+      setMatchesRaw(migrateMatches(m));
+      setPollsRaw(migratePolls(po));
+    } catch (err) {
+      if (initial) {
         console.warn('API unavailable, falling back to localStorage', err);
         setPlayersRaw(migratePlayers(loadFromStorage(STORAGE_KEYS.players) || DEF_PLAYERS));
         setMatchesRaw(migrateMatches(loadFromStorage(STORAGE_KEYS.matches) || DEF_MATCHES));
         setPollsRaw(migratePolls(loadFromStorage(STORAGE_KEYS.polls) || DEF_POLLS));
-      } finally {
-        setLoading(false);
       }
-    };
-    load();
+    } finally {
+      if (initial) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAll(true);
+    const interval = setInterval(() => fetchAll(false), 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const setPlayers = useCallback((v) => {

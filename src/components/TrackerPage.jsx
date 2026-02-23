@@ -165,6 +165,42 @@ const AddStatForm = ({ players, onAdd }) => {
   );
 };
 
+// ── Reset Stats Panel (Admin) ─────────────────────────────
+const ResetStatsPanel = ({ players, onReset }) => {
+  const [confirmId, setConfirmId] = useState(null);
+
+  const handleReset = (pid) => {
+    if (confirmId === pid) {
+      onReset(pid);
+      setConfirmId(null);
+    } else {
+      setConfirmId(pid);
+      setTimeout(() => setConfirmId(null), 3000);
+    }
+  };
+
+  return (
+    <div className="tracker-admin-panel on" style={{ marginTop: 16 }}>
+      <div className="form-title">Reset Stats par Joueur</div>
+      <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+        {players.map((p) => (
+          <button
+            key={p.id}
+            className={`btn${confirmId === p.id ? "" : " btn-solid"}`}
+            style={confirmId === p.id ? { border: "1px solid #ff4444", color: "#ff4444", background: "transparent" } : {}}
+            onClick={() => handleReset(p.id)}
+          >
+            {confirmId === p.id ? `⚠ Confirmer ${p.name}` : `🗑 ${p.name}`}
+          </button>
+        ))}
+      </div>
+      <div style={{ fontSize: "0.6rem", color: "var(--muted)", marginTop: 8, letterSpacing: "0.05em" }}>
+        Clique une fois pour sélectionner, une 2e fois pour confirmer le reset.
+      </div>
+    </div>
+  );
+};
+
 // ── Main TrackerPage ──────────────────────────────────────
 const TrackerPage = ({ toast }) => {
   const { players, stats, setStats, isAdmin } = useAppContext();
@@ -229,6 +265,14 @@ const TrackerPage = ({ toast }) => {
       return next;
     });
     toast('Stat entry added');
+  };
+
+  const handleResetStats = (pid) => {
+    setStats((prev) => ({
+      ...prev,
+      [pid]: { labels: [], kills: [], deaths: [], wins: [], losses: [] },
+    }));
+    toast(`Stats de ${players.find(p => p.id === pid)?.name || pid} réinitialisées`);
   };
 
   return (
@@ -323,6 +367,7 @@ const TrackerPage = ({ toast }) => {
         </div>
 
         {isAdmin && <AddStatForm players={players} onAdd={handleAddStat} />}
+        {isAdmin && <ResetStatsPanel players={players} onReset={handleResetStats} />}
       </div>
     </div>
   );

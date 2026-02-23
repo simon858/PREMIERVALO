@@ -98,8 +98,80 @@ const MatchDetailModal = ({ match, polls, onClose, onNavigateLineup }) => {
   );
 };
 
+// ── Edit Match Modal ──────────────────────────────────────
+const EditMatchModal = ({ match, onClose, onSave }) => {
+  const toLocalDatetime = (iso) => {
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const [form, setForm] = useState({
+    opp:  match.opponent,
+    date: toLocalDatetime(match.date),
+    map:  match.map,
+    tour: match.tournament,
+    type: match.type,
+  });
+
+  const handleSave = () => {
+    if (!form.opp.trim() || !form.date) return;
+    onSave(match.id, {
+      opponent:   form.opp.trim(),
+      date:       new Date(form.date).toISOString(),
+      map:        form.map.trim() || 'TBD',
+      tournament: form.tour.trim() || 'Friendly',
+      type:       form.type,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="match-detail-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="match-detail-box" style={{ maxWidth: 560 }}>
+        <button className="match-detail-close" onClick={onClose}>✕</button>
+        <div className="match-detail-header">
+          <div style={{ fontFamily:'var(--serif)', fontSize:'1.8rem', color:'var(--accent)', marginBottom:4 }}>Edit Match</div>
+          <div style={{ fontFamily:'var(--mono)', fontSize:'0.62rem', color:'var(--white3)', letterSpacing:'0.1em' }}>vs {match.opponent}</div>
+        </div>
+
+        <div className="form-grid" style={{ padding:'0 0 16px' }}>
+          <div className="form-group">
+            <label>Opponent</label>
+            <input className="input" value={form.opp} onChange={(e) => setForm((f) => ({...f, opp: e.target.value}))} placeholder="Arctic Foxes" />
+          </div>
+          <div className="form-group">
+            <label>Date & Time</label>
+            <input type="datetime-local" className="input" value={form.date} onChange={(e) => setForm((f) => ({...f, date: e.target.value}))} />
+          </div>
+          <div className="form-group">
+            <label>Map</label>
+            <input className="input" value={form.map} onChange={(e) => setForm((f) => ({...f, map: e.target.value}))} placeholder="Ascent" />
+          </div>
+          <div className="form-group">
+            <label>Tournament</label>
+            <input className="input" value={form.tour} onChange={(e) => setForm((f) => ({...f, tour: e.target.value}))} placeholder="VCT Challengers" />
+          </div>
+          <div className="form-group">
+            <label>Match Type</label>
+            <select className="input" value={form.type} onChange={(e) => setForm((f) => ({...f, type: e.target.value}))}>
+              <option value="official">Official Match</option>
+              <option value="training">Training Match</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button className="btn btn-solid" onClick={handleSave}>Save Changes</button>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Match Row ─────────────────────────────────────────────
-const MatchRow = ({ match, isNext, isAdmin, onClick, onDelete }) => {
+const MatchRow = ({ match, isNext, isAdmin, onClick, onDelete, onEdit }) => {
   const [cd, setCd] = useState(formatCountdown(match.date));
   const hot = isMatchHot(match.date);
 
@@ -132,10 +204,16 @@ const MatchRow = ({ match, isNext, isAdmin, onClick, onDelete }) => {
       <div style={{ textAlign:'right' }}>
         <div className={`match-countdown${hot ? ' hot' : ''}`}>{cd === 'LIVE NOW' ? 'LIVE / PAST' : cd}</div>
         {isAdmin && (
-          <button className="btn btn-ghost" style={{ fontSize:'0.6rem', padding:'6px 12px', borderColor:'var(--red)', color:'var(--red)', marginTop:8 }}
-            onClick={(e) => { e.stopPropagation(); onDelete(match.id); }}>
-            Remove
-          </button>
+          <div style={{ display:'flex', gap:6, justifyContent:'flex-end', marginTop:8 }}>
+            <button className="btn btn-ghost" style={{ fontSize:'0.6rem', padding:'6px 12px' }}
+              onClick={(e) => { e.stopPropagation(); onEdit(match); }}>
+              ✏ Edit
+            </button>
+            <button className="btn btn-ghost" style={{ fontSize:'0.6rem', padding:'6px 12px', borderColor:'var(--red)', color:'var(--red)' }}
+              onClick={(e) => { e.stopPropagation(); onDelete(match.id); }}>
+              Remove
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -144,12 +222,13 @@ const MatchRow = ({ match, isNext, isAdmin, onClick, onDelete }) => {
 
 // ── Main MatchesPage ──────────────────────────────────────
 const MatchesPage = ({ toast, onNavigateLineup }) => {
-  const { matches, setMatches, polls, isAdmin } = useAppContext();
-  const [showForm,   setShowForm]   = useState(false);
+  const { matches, setMatches, updateMatch, polls, isAdmin } = useAppContext();
+  const [showForm,    setShowForm]    = useState(false);
   const [activeMatch, setActiveMatch] = useState(null);
+  const [editMatch,   setEditMatch]   = useState(null);
   const [form, setForm] = useState({ opp:'', date:'', map:'', tour:'', type:'official' });
 
-  const sorted     = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sorted      = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
   const nextMatchId = matches
     .filter((m) => new Date(m.date) > Date.now())
     .sort((a, b) => new Date(a.date) - new Date(b.date))[0]?.id;
@@ -165,6 +244,15 @@ const MatchesPage = ({ toast, onNavigateLineup }) => {
   const handleDelete = (id) => {
     setMatches((prev) => prev.filter((m) => m.id !== id));
     toast('Match removed');
+  };
+
+  const handleSaveEdit = (id, data) => {
+    if (updateMatch) {
+      updateMatch(id, data);
+    } else {
+      setMatches((prev) => prev.map((m) => m.id === id ? { ...m, ...data } : m));
+    }
+    toast('Match updated ✓');
   };
 
   return (
@@ -189,6 +277,7 @@ const MatchesPage = ({ toast, onNavigateLineup }) => {
                 isAdmin={isAdmin}
                 onClick={() => setActiveMatch(m)}
                 onDelete={handleDelete}
+                onEdit={(match) => setEditMatch(match)}
               />
             ))
           }
@@ -224,6 +313,14 @@ const MatchesPage = ({ toast, onNavigateLineup }) => {
           polls={polls}
           onClose={() => setActiveMatch(null)}
           onNavigateLineup={onNavigateLineup}
+        />
+      )}
+
+      {editMatch && (
+        <EditMatchModal
+          match={editMatch}
+          onClose={() => setEditMatch(null)}
+          onSave={handleSaveEdit}
         />
       )}
     </div>
